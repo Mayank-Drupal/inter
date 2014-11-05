@@ -1,0 +1,201 @@
+<?php
+
+/**
+ * @file
+ * module for funcationality of site.
+ */
+
+/**
+ * Implements hook_form_hook_node_presave().
+ */
+ 
+function interyachtcharter_node_presave($node) {
+  if($node->type == 'boat_model') {
+    $term = new stdClass();
+    $term->name = $node->field_make['und'][0]['value'].' '.$node->field_model['und'][0]['value'];
+    $node->title = $node->field_make['und'][0]['value'].' '.$node->field_model['und'][0]['value'];
+    $term->vid = 4;
+    taxonomy_term_save($term);
+  }
+
+  if($node->type == 'destination') {
+    $term = new stdClass();
+    $term->name = $node->title;
+    $term->vid = 2;
+    if(isset($node->field_parent['und'][0]['tid'])) {
+      $term->parent = array($node->field_parent['und'][0]['tid']);
+    }
+    taxonomy_term_save($term);
+  }
+  
+ /* if($node->type == 'image_galleries') {
+    $term = new stdClass();
+    $term->name = $node->title;
+    $term->vid = 5;
+    if (isset($node->field_gallery_parent['und'][0]['tid'])) {
+      $term->parent = array($node->field_gallery_parent['und'][0]['tid']);
+    }
+    taxonomy_term_save($term);
+  }*/
+}
+
+function interyachtcharter_node_delete($node) {
+  if($node->type == 'boat_model') {
+    $tid = db_query('SELECT entity_id FROM {field_data_field_node_id} WHERE field_node_id_value = :nid', array(':nid' => $node->nid))->fetchField();
+    taxonomy_term_delete($tid);
+  }
+
+  /*if($node->type == 'destination') {
+    $term_name = taxonomy_get_term_by_name($node->title);
+    $term_id = array_keys($term_name);
+    taxonomy_term_delete($term_id[0]);
+  }
+  
+  if($node->type == 'image_galleries') {
+    $term_name = taxonomy_get_term_by_name($node->title);
+    $term_id = array_keys($term_name);
+    taxonomy_term_delete($term_id[0]);
+  }*/
+}
+
+/**
+ * Implements hook_menu().
+ */
+ 
+function interyachtcharter_menu() {
+  $items = array();
+
+  /*$items['admin/config/user-interface/node_import'] = array(
+    'title'            => 'NODE Import',
+    'description'      => 'Import node Form other site.',
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('interyachtcharter_import_form'),
+    'access arguments' => array('interyachtcharter node import'),
+  );*/
+
+  $items['admin/structure/image'] = array(
+    'title' => 'Image galleries',
+    'access arguments' => array('administer image galleries'),
+    'page callback' => 'interyachtcharter_admin_image_gallery',
+    'file' => 'interyachtcharter.admin.inc',
+    'description' => 'Create and manage image galleries.',
+  );
+
+  $items['admin/structure/image/list'] = array(
+    'title' => 'List',
+    'access arguments' => array('administer image galleries'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+
+  $items['admin/structure/image/add'] = array(
+    'title' => 'Add gallery',
+    'access arguments' => array('administer image galleries'),
+    'page callback' => 'interyachtcharter_admin_edit',
+    'file' => 'interyachtcharter.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  $items['admin/structure/image/edit/%'] = array(
+    'title' => 'Edit image gallery',
+    'page callback' => 'interyachtcharter_admin_edit',
+    'page arguments' => array(4),
+    'file' => 'interyachtcharter.admin.inc',
+    'access arguments' => array('administer image galleries'),
+    'type' => MENU_CALLBACK,
+  );
+  
+  return $items;
+
+}
+
+/**
+ * Implements hook_permission().
+ */
+
+function interyachtcharter_permission() {
+  return array(
+    'interyachtcharter node import' => array(
+      'title' => t('Interyachtcharter node import'),
+    ),
+    'administer image galleries' => array(
+      'title' => t('administer image galleries'),
+    ),
+  );
+}
+
+/*
+function interyachtcharter_import_form($form, &$form_state) {
+  $form['node_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Enter your node id'),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+  );
+  return $form;
+}
+
+function interyachtcharter_import_form_submit($form, &$form_state) {
+  $node_id = $form_state['values']['node_id'];
+  $unparsed_json = file_get_contents("http://192.168.0.93/drupal-7.18/mayank/node/" .$node_id. ".json");
+  $json_object = json_decode($unparsed_json);
+  $node = new stdClass(); // We create a new node object
+  $node->type = "page"; // Or any other content type you want
+  $node->title = $json_object->title;
+  $node->language = LANGUAGE_NONE; // Or any language code if Locale module is enabled. More on this below *
+  $node->path = array('alias' => 'your node path'); // Setting a node path
+  node_object_prepare($node); // Set some default values.
+  $node->uid = 1; // Or any id you wish
+  $node = node_submit($node); // Prepare node for a submit
+  node_save($node); // After this call we'll get a nid
+  drupal_set_message(t('Your node is succsesfully saved.'), 'status');
+}
+
+
+function interyachtcharter_taxonomy_term_delete($term) {
+  if ($term->vid == 3 || $term->vid == 5) {
+    $query = db_select('node', 'n');
+    $query->condition('n.title', $term->name, '=');
+    $query->fields('n', array('nid'));
+    $result = $query->execute();
+    $record = $result->fetchAssoc();
+    db_delete('node')->condition('nid', $record['nid'], '=')->execute();
+    db_delete('node_revision')->condition('nid', $record['nid'], '=')->execute();
+    db_delete('history')->condition('nid', $record['nid'], '=')->execute();
+    db_delete('node_access')->condition('nid', $record['nid'], '=')->execute();
+  }
+}
+*/
+
+function interyachtcharter_form_alter(&$form, &$form_state, $form_id) {
+  if ($form_id == 'taxonomy_form_term' && arg(1) == 'structure' && arg(2) == 'image' && (arg(3) == 'add' || arg(3) == 'edit')) {
+    $form['#submit'][] = 'interyachtcharter_gallery_admin_submit';
+  }
+}
+
+/**
+ * Form submit handler.
+ */
+function interyachtcharter_gallery_admin_submit($form, &$form_state) {
+  $status = $form_state['values']['op'];
+  if (isset($form_state['values']['tid']) && $status == 'Save') {
+    $status = 'Update';
+  }
+  switch ($status) {
+    case 'Save':
+      drupal_set_message(t('Created new gallery %term.', array('%term' => $form_state['values']['name'])));
+      break;
+
+    case 'Update':
+      drupal_set_message(t('The gallery %term has been updated.', array('%term' => $form_state['values']['name'])));
+      break;
+
+    case 'Delete':
+      drupal_set_message(t('The gallery %term has been deleted.', array('%term' => $form_state['values']['name'])));
+      taxonomy_term_delete($form_state['values']['tid']);
+      break;
+  }
+   drupal_goto('admin/structure/image');
+}
